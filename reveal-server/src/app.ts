@@ -1,3 +1,4 @@
+import os from "os";
 import express from "express";
 import cors from "cors";
 import type { RevealRequestListener } from "reveal-sdk-node";
@@ -22,7 +23,11 @@ export function createApp(): AppWithReveal {
   app.get("/health", async (_req, res) => {
     try {
       const result = await pool.query("SELECT NOW() as time");
-      res.json({ status: "healthy", database: { connected: true, time: result.rows[0].time } });
+      res.json({
+        status: "healthy",
+        platform: { os: os.platform(), arch: os.arch(), nodeVersion: process.version },
+        database: { connected: true, time: result.rows[0].time },
+      });
     } catch (error) {
       res.status(503).json({ status: "unhealthy", database: { connected: false } });
     }

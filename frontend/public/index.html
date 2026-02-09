@@ -30,6 +30,7 @@
   </header>
 
   <div id="key-info" class="key-info" style="display:none;">
+    <span><span class="label">Platform: </span><span id="server-platform" class="fingerprint">...</span></span>
     <span><span class="label">Private key: </span><span id="private-key-fp" class="fingerprint">...</span></span>
     <span><span class="label">Public key: </span><span id="public-key-fp" class="fingerprint">...</span></span>
   </div>
@@ -145,6 +146,11 @@ o/j7rSxGMV81roZ+YuDA0Ig=
         if (data.status === "healthy") {
           statusEl.textContent = "Server OK";
           statusEl.className = "status ok";
+          if (data.platform) {
+            document.getElementById("server-platform").textContent =
+              data.platform.os + "/" + data.platform.arch + " (Node " + data.platform.nodeVersion + ")";
+            document.getElementById("key-info").style.display = "flex";
+          }
           return true;
         }
       } catch (e) {
