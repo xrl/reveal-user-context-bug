@@ -13,6 +13,9 @@
     .status.ok { background: #2ecc71; color: white; }
     .status.error { background: #e74c3c; color: white; }
     .status.loading { background: #f39c12; color: white; }
+    .key-info { background: #f8f9fa; border: 1px solid #ddd; margin: 8px 24px; padding: 12px 16px; font-size: 13px; font-family: monospace; display: flex; gap: 24px; }
+    .key-info .label { color: #666; }
+    .key-info .fingerprint { color: #1a1a2e; font-weight: 600; }
     .instructions { background: white; border-left: 4px solid #e74c3c; margin: 16px 24px; padding: 16px; font-size: 14px; line-height: 1.6; }
     .instructions h2 { font-size: 15px; margin-bottom: 8px; color: #e74c3c; }
     .instructions ol { padding-left: 20px; }
@@ -25,6 +28,11 @@
     <h1>Reveal SDK - IndexOutOfRangeException Bug Reproduction</h1>
     <span id="server-status" class="status loading">Checking server...</span>
   </header>
+
+  <div id="key-info" class="key-info" style="display:none;">
+    <span><span class="label">Private key: </span><span id="private-key-fp" class="fingerprint">...</span></span>
+    <span><span class="label">Public key: </span><span id="public-key-fp" class="fingerprint">...</span></span>
+  </div>
 
   <div class="instructions">
     <h2>Steps to reproduce the bug</h2>
@@ -81,6 +89,37 @@ o/j7rSxGMV81roZ+YuDA0Ig=
 
     const REVEAL_SERVER_URL = "http://localhost:5111";
 
+    function sha256Fingerprint(pem) {
+      // Hash just the base64 key material (strip PEM headers/whitespace) for a stable fingerprint
+      var keyBody = pem.replace(/-----[^-]+-----/g, "").replace(/\s/g, "");
+      var hex = KJUR.crypto.Util.hashString(keyBody, "sha256");
+      return hex.slice(0, 16);
+    }
+
+    function showKeyFingerprints() {
+      try {
+        // Fingerprint the private key
+        var privFp = sha256Fingerprint(PRIVATE_KEY_PEM);
+
+        // Derive the public key from the private key using jsrsasign
+        var prvKey = KEYUTIL.getKey(PRIVATE_KEY_PEM);
+        // Create a public-key-only RSA key from n and e
+        var pubKey = new RSAKey();
+        pubKey.setPublic(prvKey.n.toString(16), prvKey.e.toString(16));
+        var pubPem = KEYUTIL.getPEM(pubKey);
+        var pubFp = sha256Fingerprint(pubPem);
+
+        document.getElementById("private-key-fp").textContent = privFp;
+        document.getElementById("public-key-fp").textContent = pubFp;
+        document.getElementById("key-info").style.display = "flex";
+      } catch (e) {
+        console.error("Failed to compute key fingerprints:", e);
+        document.getElementById("private-key-fp").textContent = "error";
+        document.getElementById("public-key-fp").textContent = "error";
+        document.getElementById("key-info").style.display = "flex";
+      }
+    }
+
     function generateJWT() {
       const header = { alg: "RS256", typ: "JWT" };
       const now = Math.floor(Date.now() / 1000);
@@ -117,6 +156,9 @@ o/j7rSxGMV81roZ+YuDA0Ig=
     }
 
     async function init() {
+      // Show key fingerprints immediately
+      showKeyFingerprints();
+
       // Wait for server to be ready (retry for up to 60s)
       let ready = false;
       for (let i = 0; i < 30; i++) {

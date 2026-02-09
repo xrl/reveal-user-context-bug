@@ -1,4 +1,5 @@
 import fs from "fs";
+import crypto from "crypto";
 import { logger } from "./logger.js";
 
 export interface JwtConfig {
@@ -25,6 +26,13 @@ export function loadJwtConfig(): JwtConfig {
     process.exit(1);
   }
 
-  logger.info("JWT public key loaded");
+  // Hash just the base64 key material (strip PEM headers/whitespace) for a stable fingerprint
+  const keyBody = publicKey.replace(/-----[^-]+-----/g, "").replace(/\s/g, "");
+  const fingerprint = crypto
+    .createHash("sha256")
+    .update(keyBody)
+    .digest("hex")
+    .slice(0, 16);
+  logger.info({ fingerprint }, `JWT public key loaded (fingerprint: ${fingerprint})`);
   return { publicKey };
 }
