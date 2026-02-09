@@ -1,5 +1,6 @@
 import { createApp } from "./app.js";
 import { logger } from "./config/logger.js";
+import { pool } from "./config/database.js";
 
 const port = parseInt(process.env.PORT || "5111", 10);
 
@@ -22,6 +23,15 @@ for (const key of envKeys) {
   } else {
     logger.info({ key, value: val ?? "(not set)" }, `  ${key} = ${val ?? "(not set)"}`);
   }
+}
+
+// Verify postgres is reachable before starting
+try {
+  const result = await pool.query("SELECT 1");
+  logger.info("PostgreSQL connection verified");
+} catch (err) {
+  logger.fatal({ err }, "Cannot connect to PostgreSQL — aborting startup");
+  process.exit(1);
 }
 
 const { app } = createApp();
