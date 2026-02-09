@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reveal SDK Bug Reproduction</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
+    header { background: #1a1a2e; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 18px; font-weight: 500; }
+    .status { font-size: 13px; padding: 4px 12px; border-radius: 4px; }
+    .status.ok { background: #2ecc71; color: white; }
+    .status.error { background: #e74c3c; color: white; }
+    .status.loading { background: #f39c12; color: white; }
+    .instructions { background: white; border-left: 4px solid #e74c3c; margin: 16px 24px; padding: 16px; font-size: 14px; line-height: 1.6; }
+    .instructions h2 { font-size: 15px; margin-bottom: 8px; color: #e74c3c; }
+    .instructions ol { padding-left: 20px; }
+    .instructions code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+    #reveal-container { margin: 16px 24px; background: white; height: calc(100vh - 220px); min-height: 500px; border: 1px solid #ddd; position: relative; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Reveal SDK - IndexOutOfRangeException Bug Reproduction</h1>
+    <span id="server-status" class="status loading">Checking server...</span>
+  </header>
+
+  <div class="instructions">
+    <h2>Steps to reproduce the bug</h2>
+    <ol>
+      <li>Wait for the dashboard editor to load below (server status should show "Server OK")</li>
+      <li>Click the <strong>"+"</strong> button in the dashboard to add a visualization</li>
+      <li>Select <strong>"Transactions Database"</strong> from the data source list</li>
+      <li>The connection verification will fail with <strong>"Something went wrong"</strong></li>
+      <li>Check the engine log: <code>docker exec reveal-user-context-provider-bug-reveal-server-1 cat /tmp/reveal-logs/RevealLog.txt | grep Exception</code></li>
+    </ol>
+  </div>
+
+  <div id="reveal-container"></div>
+
+  <!-- jQuery (required by Reveal SDK) -->
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+
+  <!-- Reveal SDK client -->
+  <script src="https://dl.revealbi.io/reveal/libs/1.8.3/infragistics.reveal.js"></script>
+
+  <!-- jsrsasign for JWT signing in the browser -->
+  <script src="https://cdn.jsdelivr.net/npm/jsrsasign@11.1.0/lib/jsrsasign-all-min.js"></script>
+
+  <script>
+    // Hard-coded RSA private key for JWT signing (this is a bug repro, not production)
+    const PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFLcbk1ReKpYgj
+xw2tSZ1drAsHzgeN4GfEiTH6PDOBMIVyw8bkhPDZeo/StF+6TsZZ1PtE3PSOcphM
+ijuNTXj+eHC3NSQ81dLTQO2xNhl6I0IFIEtYwEPIGORh3dr0lwF7k2hdQm/usoAt
+rY18x97MDIGJ9e0o/+1SNga6h1aYNGeuAKwLcIq/7d0RMtXpnEA9qL3wbqkS3XqE
+4qnP0MC0lwjrN0Xlwahu9OIIPN27U72pXlL0GAhJ6XPmbESmulvl9lYOVxP+8jDN
+JCQJWU6OnxGO3KOaE3O2wx06h7QyA8vBrQ8UILCmCxg/H7gmnOR2iz1aE3Jt7Ojk
+2NHFw1ufAgMBAAECggEAW2TpgN3IqKorXTIBg+XQPD/naPm1hKyUTIOvF6bZ1LLR
+2C0ovnlkTdnCWk7i5C9pPvA6e2PTM0eokimsisVzJLhcvn6ySkRuER9STUafLn6z
+Nj8OzZdok5H+IeK8f4yS0l20DS4jRceVJBcCsujNu1S8ol7MS6m8rdN+8OyUVb16
+nU9jOWERQOkpMxP+4yS/SqukJHzM/fyR+0i9Tb6AsNCvhw7HppomUW8AeJinwTEE
+jcMBsRrTYYflnyr/29P33S+4T+0k0uWgVfL3HAnwEmcgJZIAha/1jXXH/E1qoyn1
+TaP2L1IBzCo/d23K1D3lAj3QEZeTLIK36dqOjbYlIQKBgQD/w6K8Qf5FJkFQp6dd
+NfaOcH9vsQwGN4d/IYltPPCjJxRFYAhLDuh0UqkC99HfPAcBUXik4A9JKGTAIY7N
+95SU6YK5d5Bgj+dcZfB4z3/FOaEUnAKJQ6CMUbvRa2mrWsRkbAGAW9ZzLo8EB32j
+YsI494w947pU475yDFUnppjzcQKBgQDFXFBucdc+dmKHigoRkNHb6OWGgg4fMmUX
+tsHXYatY/0clM/Cvzn+hDAdbbluAZiECCBfYOzekIob+Qiz8DuBN3ach/V4rUEdE
+7gNLf6/9AQcrWkWpT8dYPiiMCKXim+4vQOTw+zgRz6s98bm1nn1CF9Q54Ljcg1S2
+d9BkkWKYDwKBgQCr08Y3zepCkKHeytOw1nkvVrr20a4vWw0HxwMpxYAxTCbdONg5
+fOmEhKgRW2a/H/fg1dhEhFcgoieVwLXNACDtLjfp3D698M/RjpbQwy6m1MG4M9us
+Vie9PYf9+LjEKzW39avIjWp0dXoVjebFZqrvVLf+OElNkLe4rTpkahNlsQKBgDtY
+rgr4CoyK1sgBF1P+40wodVSEKTDyW3nNB+73PKovYTprqvWCt9g6oL+6qKMsksJk
+op7v96RQiZ1NUu+cnZBslYRgBwApTLUKiU0boVUICRrdM1NdXQlI77JkK1XAI9hr
+wCxCrrKUat7eoERf2zSTq8qXq58Lkt6nmq+TFD27AoGAHNv8R1rtysCwXtRjlnsa
+ltxh9VTPvzubIwWDK3DzaIPf1UBcLg61pe2uyjlpfU0/Y6lf0j8zvZ2T2YD6tbvQ
+ubQTvmTRZ8phTeNrCvvW/5E97ag92yl2FfcVZeiOz9kiW/ifnUbrqUKJgQCtGip6
+o/j7rSxGMV81roZ+YuDA0Ig=
+-----END PRIVATE KEY-----`;
+
+    const REVEAL_SERVER_URL = "http://localhost:5111";
+
+    function generateJWT() {
+      const header = { alg: "RS256", typ: "JWT" };
+      const now = Math.floor(Date.now() / 1000);
+      const payload = {
+        sub: "user-1",
+        org_id: 1,
+        iss: "repro-app",
+        iat: now,
+        exp: now + 3600
+      };
+
+      const sHeader = JSON.stringify(header);
+      const sPayload = JSON.stringify(payload);
+      const prvKey = KEYUTIL.getKey(PRIVATE_KEY_PEM);
+      return KJUR.jws.JWS.sign("RS256", sHeader, sPayload, prvKey);
+    }
+
+    async function checkServerHealth() {
+      const statusEl = document.getElementById("server-status");
+      try {
+        const response = await fetch(REVEAL_SERVER_URL + "/health");
+        const data = await response.json();
+        if (data.status === "healthy") {
+          statusEl.textContent = "Server OK";
+          statusEl.className = "status ok";
+          return true;
+        }
+      } catch (e) {
+        // Server not ready yet
+      }
+      statusEl.textContent = "Server unavailable";
+      statusEl.className = "status error";
+      return false;
+    }
+
+    async function init() {
+      // Wait for server to be ready (retry for up to 60s)
+      let ready = false;
+      for (let i = 0; i < 30; i++) {
+        ready = await checkServerHealth();
+        if (ready) break;
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
+      if (!ready) {
+        document.getElementById("reveal-container").innerHTML =
+          '<p style="padding: 24px; color: #e74c3c;">Could not connect to reveal-server at ' + REVEAL_SERVER_URL + '</p>';
+        return;
+      }
+
+      // Generate JWT
+      const token = generateJWT();
+
+      // Configure Reveal SDK
+      $.ig.RevealSdkSettings.setBaseUrl(REVEAL_SERVER_URL);
+      $.ig.RevealSdkSettings.setAdditionalHeadersProvider(function() {
+        return { "Authorization": "Bearer " + token };
+      });
+
+      // Create new dashboard in edit mode
+      var revealView = new $.ig.RevealView("#reveal-container");
+      var dashboard = new $.ig.RVDashboard();
+      revealView.dashboard = dashboard;
+      revealView.canEdit = true;
+      revealView.startInEditMode = true;
+
+      // Configure the data source picker
+      revealView.onDataSourcesRequested = function(callback) {
+        var postgresDataSource = new $.ig.RVPostgresDataSource();
+        postgresDataSource.id = "transactions-db";
+        postgresDataSource.title = "Transactions Database";
+
+        callback(new $.ig.RevealDataSources([postgresDataSource], [], false));
+      };
+    }
+
+    // Start when page loads
+    $(document).ready(function() {
+      init();
+    });
+  </script>
+</body>
+</html>

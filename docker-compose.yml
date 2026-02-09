@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin_password
+      POSTGRES_DB: repro_db
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d repro_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  reveal-server:
+    build:
+      context: ./reveal-server
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    ports:
+      - "5111:5111"
+    environment:
+      PORT: "5111"
+      NODE_ENV: development
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_DATABASE: repro_db
+      REVEAL_DB_USER: app_user
+      REVEAL_DB_PASSWORD: app_password
+      REVEAL_LICENSE: ${REVEAL_LICENSE:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5111/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 15s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      reveal-server:
+        condition: service_healthy
