@@ -21,8 +21,9 @@ The crash happens regardless of:
 ## Quick Start
 
 ```bash
-# Set your Reveal SDK license key
-export REVEAL_LICENSE="your-license-key-here"
+# Copy the example env and fill in your Reveal SDK license key
+cp reveal-server/.env.example reveal-server/.env
+# Edit reveal-server/.env and set REVEAL_LICENSE to your license key
 
 docker compose up --build
 ```
@@ -79,8 +80,11 @@ docker compose up postgres frontend
 # Terminal 2: Start reveal-server natively
 cd reveal-server
 source .env
-npx tsx src/index.ts
+PG_HOST=localhost npx tsx src/index.ts
 ```
+
+Note: The `.env` has `PG_HOST=postgres` for Docker. Override it with `PG_HOST=localhost`
+when running natively.
 
 Open http://localhost:3000 — on osx-arm64 the verify-connection step works correctly.
 
