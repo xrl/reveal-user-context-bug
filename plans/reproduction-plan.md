@@ -372,3 +372,57 @@ docker exec reveal-user-context-provider-bug-reveal-server-1 \
   initial setup, only when the Reveal client saves a dashboard).
 - The frontend uses CDN-hosted Reveal JS SDK and jsrsasign -- no build step needed.
 - Hard-coded JWT keys mean zero setup for the Infragistics team: just `docker compose up`.
+
+---
+
+## Debugging Notes (Native macOS Dev Server)
+
+### Problem: Native server also shows "Verification failed"
+
+When running the reveal-server natively on macOS (osx-arm64) via `pnpm dev`, the
+"Verify Connection" step also fails with "Something went wrong." This is a
+**different issue** from the linux-x64 `IndexOutOfRangeException`.
+
+### Root causes found
+
+1. **`--env-file` flag doesn't work with `tsx`**: The dev script
+   `tsx watch --env-file=.env src/index.ts` passes `--env-file` to tsx, not to
+   node. tsx silently ignores it, so **no env vars from `.env` are loaded**. This
+   means `REVEAL_LICENSE` is empty, causing the .NET engine to exit immediately
+   with "The license key is missing or has expired." The Node.js process stays
+   alive (Express still serves `/health`) but all reveal-api requests fail because
+   the engine is dead.
+
+   **Fix**: Either:
+   - Use `node --env-file=.env --import=tsx src/index.ts` (passes flag to node)
+   - Or `set -a; source .env; set +a` before running `pnpm dev`
+
+2. **`.env` had wrong database credentials**: The `.env` originally had
+   `PG_PORT=32780` and `REVEAL_DB_USER=xlange` (personal local postgres settings).
+   The docker compose postgres runs on port **5432** with user **app_user** /
+   password **app_password**. Updated `.env` to match docker compose postgres.
+
+3. **Engine log file truncation breaks logging**: The .NET engine opens
+   `/tmp/reveal-logs/reveal-engine.log` once at startup. If you truncate the file
+   (e.g. `> reveal-engine.log`), the engine's file handle becomes invalid and no
+   further logs are written. Must restart the server to get logging back.
+
+### Native dev workflow (correct)
+
+```bash
+# Terminal 1: Start postgres + frontend via docker compose
+docker compose up postgres frontend
+
+# Terminal 2: Start reveal-server natively
+cd reveal-server
+source .env  # or: set -a; source .env; set +a
+npx tsx src/index.ts
+
+# Open http://localhost:3000
+```
+
+### Confirmed: osx-arm64 works, linux-x64 crashes
+
+When the native server is running correctly (license loaded, database connected),
+the osx-arm64 engine handles verify-connection without errors. The
+`IndexOutOfRangeException` is linux-x64 only.

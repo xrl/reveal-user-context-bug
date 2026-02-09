@@ -68,6 +68,28 @@ postgres (PostgreSQL 17, port 5432)
   └─ reveal.dashboards table for dashboard storage
 ```
 
+## Local Development (Native macOS)
+
+To run the reveal-server natively on macOS (useful for confirming the bug is linux-x64 only):
+
+```bash
+# Terminal 1: Start postgres + frontend via docker compose
+docker compose up postgres frontend
+
+# Terminal 2: Start reveal-server natively
+cd reveal-server
+source .env
+npx tsx src/index.ts
+```
+
+Open http://localhost:3000 — on osx-arm64 the verify-connection step works correctly.
+
+**Important**: Do NOT use `tsx watch --env-file=.env` — the `--env-file` flag gets
+passed to tsx (which silently ignores it), not to node. This means env vars like
+`REVEAL_LICENSE` won't be loaded and the .NET engine will exit immediately with a
+license error while Express keeps serving `/health`. Either `source .env` before
+running, or use `node --env-file=.env --import=tsx src/index.ts`.
+
 ## Versions Tested
 
 | Package | Version | Result |

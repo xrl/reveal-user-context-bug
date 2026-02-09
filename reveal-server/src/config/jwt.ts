@@ -11,10 +11,12 @@ export function loadJwtConfig(): JwtConfig {
   if (process.env.REVEAL_BI_JWT_PUBLIC_KEY) {
     publicKey = process.env.REVEAL_BI_JWT_PUBLIC_KEY;
   } else {
-    // Look for the key file at a default path
-    const keyPath = "/app/jwt-public.pem";
-    if (fs.existsSync(keyPath)) {
-      publicKey = fs.readFileSync(keyPath, "utf8");
+    // Look for the key file at known paths
+    for (const keyPath of ["/app/jwt-public.pem", "jwt-public.pem"]) {
+      if (fs.existsSync(keyPath)) {
+        publicKey = fs.readFileSync(keyPath, "utf8");
+        break;
+      }
     }
   }
 
